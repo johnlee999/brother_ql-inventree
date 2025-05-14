@@ -159,6 +159,7 @@ def env(ctx, *args, **kwargs):
 @click.option('--hq', is_flag=True, help='Print with high quality (slower). Default is low quality.')
 @click.option('--no-cut', is_flag=True, help="Don't cut the tape after printing the label.")
 @click.option('-q', '--queue', is_flag=True, help='Enable print queue support.')
+@click.option('--copies', type=int, default=1, show_default=True, help='Specify the number of copies to print.')
 @click.pass_context
 def print_cmd(ctx, *args, **kwargs):
     """ Print a label of the provided IMAGE. """
@@ -175,13 +176,11 @@ def print_cmd(ctx, *args, **kwargs):
     del kwargs['no_cut']
     use_print_queue = kwargs.get('queue', False)
     if use_print_queue:
-        # Print Queue with error handlers
         printer_instance = get_printer(printer_identifier=printer, backend_identifier=backend)
         queue = BrotherPrintQueue(printer_instance, qlr)
         queue.queue_image(**kwargs)
         queue.submit()
-    else: 
-        # Legacy print method without error handling
+    else:
         instructions = convert(qlr=qlr, **kwargs)
         send(instructions=instructions, printer_identifier=printer, backend_identifier=backend, blocking=True)
 
