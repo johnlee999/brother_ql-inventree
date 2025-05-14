@@ -156,7 +156,7 @@ def env(ctx, *args, **kwargs):
 @click.option('-c', '--compress', is_flag=True, help='Enable compression (if available with the model). Label creation can take slightly longer but the resulting instruction size is normally considerably smaller.')
 @click.option('--red', is_flag=True, help='Create a label to be printed on black/red/white tape (only with QL-8xx series on DK-22251 labels). You must use this option when printing on black/red tape, even when not printing red.')
 @click.option('--600dpi', 'dpi_600', is_flag=True, help='Print with 600x300 dpi available on some models. Provide your image as 600x600 dpi; perpendicular to the feeding the image will be resized to 300dpi.')
-@click.option('--lq', is_flag=True, help='Print with low quality (faster). Default is high quality.')
+@click.option('--hq', is_flag=True, help='Print with high quality (slower). Default is low quality.')
 @click.option('--no-cut', is_flag=True, help="Don't cut the tape after printing the label.")
 @click.option('-q', '--queue', is_flag=True, help='Enable print queue support.')
 @click.pass_context

@@ -63,7 +63,7 @@ class BrotherQLBackendNetwork(BrotherQLBackendGeneric):
             raise NotImplementedError('Currently the printer can be specified either via an appropriate string or via an os.open() handle.')
 
     def _write(self, data):
-        self.s.settimeout(10)
+        self.s.settimeout(120)
         self.s.sendall(data)
         self.s.settimeout(self.read_timeout)
 

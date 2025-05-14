@@ -160,7 +160,13 @@ class BrotherQLRaster(object):
         vals = [self._mtype, self._mwidth, self._mlength]
         self.data += b''.join(b'\x00' if val is None else val for val in vals)
         self.data += struct.pack('<L', rnumber)
-        self.data += bytes([0 if self.page_number == 0 else 1])
+        # self.data += bytes([0 if self.page_number == 0 else 1])
+        if self.page_number == 0:
+            n9 = 0
+            self.page_number = 1
+        else:
+            n9 = 1
+        self.data += bytes([n9])
         self.data += b'\x00'
         # INFO:  media/quality (1B 69 7A) --> found! (payload: 8E 0A 3E 00 D2 00 00 00 00 00)
 
