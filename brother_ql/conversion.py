@@ -15,6 +15,89 @@ logger = logging.getLogger(__name__)
 
 logging.getLogger("PIL.PngImagePlugin").setLevel(logging.WARNING)
 
+def preprocess_image(im, label_specs, qlr, options):
+    """
+    画像の前処理（ラスタライズ化）を行う関数。
+    options: dictで、red, dither, rotate, dpi_600, dots_printable, device_pixel_width, right_margin_dots, threshold などを含む
+    戻り値: (im, black_im, red_im)
+    """
+    red = options.get('red', False)
+    dither = options.get('dither', False)
+    rotate = options.get('rotate', 'auto')
+    dpi_600 = options.get('dpi_600', False)
+    dots_printable = options['dots_printable']
+    device_pixel_width = options['device_pixel_width']
+    right_margin_dots = options['right_margin_dots']
+    threshold = options['threshold']
+
+    black_im = None
+    red_im = None
+
+    if im.mode.endswith('A'):
+        bg = Image.new("RGB", im.size, (255,255,255))
+        bg.paste(im, im.split()[-1])
+        im = bg
+    elif im.mode == "P":
+        im = im.convert("RGB" if red else "L")
+    elif im.mode == "L" and red:
+        im = im.convert("RGB")
+
+    if dpi_600:
+        dots_expected = [el*2 for el in dots_printable]
+    else:
+        dots_expected = dots_printable
+
+    if label_specs['kind'] in (ENDLESS_LABEL, PTOUCH_ENDLESS_LABEL):
+        if rotate not in ('auto', 0):
+            im = im.rotate(rotate, expand=True)
+        if dpi_600:
+            im = im.resize((im.size[0]//2, im.size[1]))
+        if im.size[0] != dots_printable[0]:
+            hsize = int((dots_printable[0] / im.size[0]) * im.size[1])
+            im = im.resize((dots_printable[0], hsize), Image.LANCZOS)
+        if im.size[0] < device_pixel_width:
+            new_im = Image.new(im.mode, (device_pixel_width, im.size[1]), (255,)*len(im.mode))
+            new_im.paste(im, (device_pixel_width-im.size[0]-right_margin_dots, 0))
+            im = new_im
+    elif label_specs['kind'] in (DIE_CUT_LABEL, ROUND_DIE_CUT_LABEL):
+        if rotate == 'auto':
+            if im.size[0] == dots_expected[1] and im.size[1] == dots_expected[0]:
+                im = im.rotate(90, expand=True)
+        elif rotate != 0:
+            im = im.rotate(rotate, expand=True)
+        if im.size[0] != dots_expected[0] or im.size[1] != dots_expected[1]:
+            raise ValueError("Bad image dimensions: %s. Expecting: %s." % (im.size, dots_expected))
+        if dpi_600:
+            im = im.resize((im.size[0]//2, im.size[1]))
+        new_im = Image.new(im.mode, (device_pixel_width, dots_expected[1]), (255,)*len(im.mode))
+        new_im.paste(im, (device_pixel_width-im.size[0]-right_margin_dots, 0))
+        im = new_im
+
+    if red:
+        filter_h = lambda h: 255 if (h <  40 or h > 210) else 0
+        filter_s = lambda s: 255 if s > 100 else 0
+        filter_v = lambda v: 255 if v >  80 else 0
+        red_im = filtered_hsv(im, filter_h, filter_s, filter_v)
+        red_im = red_im.convert("L")
+        red_im = PIL.ImageOps.invert(red_im)
+        red_im = red_im.point(lambda x: 0 if x < threshold else 255, mode="1")
+        filter_h = lambda h: 255
+        filter_s = lambda s: 255
+        filter_v = lambda v: 255 if v <  80 else 0
+        black_im = filtered_hsv(im, filter_h, filter_s, filter_v)
+        black_im = black_im.convert("L")
+        black_im = PIL.ImageOps.invert(black_im)
+        black_im = black_im.point(lambda x: 0 if x < threshold else 255, mode="1")
+        black_im = PIL.ImageChops.subtract(black_im, red_im)
+    else:
+        im = im.convert("L")
+        im = PIL.ImageOps.invert(im)
+        if dither:
+            im = im.convert("1", dither=Image.FLOYDSTEINBERG)
+        else:
+            im = im.point(lambda x: 0 if x < threshold else 255, mode="1")
+    return im, black_im, red_im
+
 def _rasterize_images(qlr: BrotherQLRaster, images, label, queue: bool = False, copies: int = 1, **kwargs):
     """
     copies: 同じ画像を何枚印刷するか（効率化用）
@@ -53,71 +136,8 @@ def _rasterize_images(qlr: BrotherQLRaster, images, label, queue: bool = False, 
             except OSError:
                 raise NotImplementedError("The image argument needs to be an Image() instance, the filename to an image, or a file handle.")
         # --- ここから下は既存の前処理 ---
-        if im.mode.endswith('A'):
-            # place in front of white background and get red of transparency
-            bg = Image.new("RGB", im.size, (255,255,255))
-            bg.paste(im, im.split()[-1])
-            im = bg
-        elif im.mode == "P":
-            # Convert GIF ("P") to RGB
-            im = im.convert("RGB" if red else "L")
-        elif im.mode == "L" and red:
-            # Convert greyscale to RGB if printing on black/red tape
-            im = im.convert("RGB")
-        if dpi_600:
-            dots_expected = [el*2 for el in dots_printable]
-        else:
-            dots_expected = dots_printable
-        if label_specs['kind'] in (ENDLESS_LABEL, PTOUCH_ENDLESS_LABEL):
-            if rotate not in ('auto', 0):
-                im = im.rotate(rotate, expand=True)
-            if dpi_600:
-                im = im.resize((im.size[0]//2, im.size[1]))
-            if im.size[0] != dots_printable[0]:
-                hsize = int((dots_printable[0] / im.size[0]) * im.size[1])
-                im = im.resize((dots_printable[0], hsize), Image.LANCZOS)
-                logger.debug('Need to resize the image...')
-            if im.size[0] < device_pixel_width:
-                new_im = Image.new(im.mode, (device_pixel_width, im.size[1]), (255,)*len(im.mode))
-                new_im.paste(im, (device_pixel_width-im.size[0]-right_margin_dots, 0))
-                im = new_im
-        elif label_specs['kind'] in (DIE_CUT_LABEL, ROUND_DIE_CUT_LABEL):
-            if rotate == 'auto':
-                if im.size[0] == dots_expected[1] and im.size[1] == dots_expected[0]:
-                    im = im.rotate(90, expand=True)
-            elif rotate != 0:
-                im = im.rotate(rotate, expand=True)
-            if im.size[0] != dots_expected[0] or im.size[1] != dots_expected[1]:
-                raise ValueError("Bad image dimensions: %s. Expecting: %s." % (im.size, dots_expected))
-            if dpi_600:
-                im = im.resize((im.size[0]//2, im.size[1]))
-            new_im = Image.new(im.mode, (device_pixel_width, dots_expected[1]), (255,)*len(im.mode))
-            new_im.paste(im, (device_pixel_width-im.size[0]-right_margin_dots, 0))
-            im = new_im
-        if red:
-            filter_h = lambda h: 255 if (h <  40 or h > 210) else 0
-            filter_s = lambda s: 255 if s > 100 else 0
-            filter_v = lambda v: 255 if v >  80 else 0
-            red_im = filtered_hsv(im, filter_h, filter_s, filter_v)
-            red_im = red_im.convert("L")
-            red_im = PIL.ImageOps.invert(red_im)
-            red_im = red_im.point(lambda x: 0 if x < threshold else 255, mode="1")
-            filter_h = lambda h: 255
-            filter_s = lambda s: 255
-            filter_v = lambda v: 255 if v <  80 else 0
-            black_im = filtered_hsv(im, filter_h, filter_s, filter_v)
-            black_im = black_im.convert("L")
-            black_im = PIL.ImageOps.invert(black_im)
-            black_im = black_im.point(lambda x: 0 if x < threshold else 255, mode="1")
-            black_im = PIL.ImageChops.subtract(black_im, red_im)
-        else:
-            im = im.convert("L")
-            im = PIL.ImageOps.invert(im)
-        if dither:
-            im = im.convert("1", dither=Image.FLOYDSTEINBERG)
-        else:
-            im = im.point(lambda x: 0 if x < threshold else 255, mode="1")
-        # --- ここまで前処理 ---
+        options = dict(red=red, dither=dither, rotate=rotate, dpi_600=dpi_600, dots_printable=dots_printable, device_pixel_width=device_pixel_width, right_margin_dots=right_margin_dots, threshold=threshold)
+        im, black_im, red_im = preprocess_image(im, label_specs, qlr, options)
         for i in range(copies):
             is_last = (i == copies - 1)
             qlr.clear()
@@ -177,75 +197,8 @@ def _rasterize_images(qlr: BrotherQLRaster, images, label, queue: bool = False, 
                 except OSError:
                     raise NotImplementedError("The image argument needs to be an Image() instance, the filename to an image, or a file handle.")
 
-            if im.mode.endswith('A'):
-                # place in front of white background and get red of transparency
-                bg = Image.new("RGB", im.size, (255,255,255))
-                bg.paste(im, im.split()[-1])
-                im = bg
-            elif im.mode == "P":
-                # Convert GIF ("P") to RGB
-                im = im.convert("RGB" if red else "L")
-            elif im.mode == "L" and red:
-                # Convert greyscale to RGB if printing on black/red tape
-                im = im.convert("RGB")
-
-            if dpi_600:
-                dots_expected = [el*2 for el in dots_printable]
-            else:
-                dots_expected = dots_printable
-
-            if label_specs['kind'] in (ENDLESS_LABEL, PTOUCH_ENDLESS_LABEL):
-                if rotate not in ('auto', 0):
-                    im = im.rotate(rotate, expand=True)
-                if dpi_600:
-                    im = im.resize((im.size[0]//2, im.size[1]))
-                if im.size[0] != dots_printable[0]:
-                    hsize = int((dots_printable[0] / im.size[0]) * im.size[1])
-                    im = im.resize((dots_printable[0], hsize), Image.LANCZOS)
-                    logger.debug('Need to resize the image...')
-                if im.size[0] < device_pixel_width:
-                    new_im = Image.new(im.mode, (device_pixel_width, im.size[1]), (255,)*len(im.mode))
-                    new_im.paste(im, (device_pixel_width-im.size[0]-right_margin_dots, 0))
-                    im = new_im
-            elif label_specs['kind'] in (DIE_CUT_LABEL, ROUND_DIE_CUT_LABEL):
-                if rotate == 'auto':
-                    if im.size[0] == dots_expected[1] and im.size[1] == dots_expected[0]:
-                        im = im.rotate(90, expand=True)
-                elif rotate != 0:
-                    im = im.rotate(rotate, expand=True)
-                if im.size[0] != dots_expected[0] or im.size[1] != dots_expected[1]:
-                    raise ValueError("Bad image dimensions: %s. Expecting: %s." % (im.size, dots_expected))
-                if dpi_600:
-                    im = im.resize((im.size[0]//2, im.size[1]))
-                new_im = Image.new(im.mode, (device_pixel_width, dots_expected[1]), (255,)*len(im.mode))
-                new_im.paste(im, (device_pixel_width-im.size[0]-right_margin_dots, 0))
-                im = new_im
-
-            if red:
-                filter_h = lambda h: 255 if (h <  40 or h > 210) else 0
-                filter_s = lambda s: 255 if s > 100 else 0
-                filter_v = lambda v: 255 if v >  80 else 0
-                red_im = filtered_hsv(im, filter_h, filter_s, filter_v)
-                red_im = red_im.convert("L")
-                red_im = PIL.ImageOps.invert(red_im)
-                red_im = red_im.point(lambda x: 0 if x < threshold else 255, mode="1")
-
-                filter_h = lambda h: 255
-                filter_s = lambda s: 255
-                filter_v = lambda v: 255 if v <  80 else 0
-                black_im = filtered_hsv(im, filter_h, filter_s, filter_v)
-                black_im = black_im.convert("L")
-                black_im = PIL.ImageOps.invert(black_im)
-                black_im = black_im.point(lambda x: 0 if x < threshold else 255, mode="1")
-                black_im = PIL.ImageChops.subtract(black_im, red_im)
-            else:
-                im = im.convert("L")
-                im = PIL.ImageOps.invert(im)
-
-                if dither:
-                    im = im.convert("1", dither=Image.FLOYDSTEINBERG)
-                else:
-                    im = im.point(lambda x: 0 if x < threshold else 255, mode="1")
+            options = dict(red=red, dither=dither, rotate=rotate, dpi_600=dpi_600, dots_printable=dots_printable, device_pixel_width=device_pixel_width, right_margin_dots=right_margin_dots, threshold=threshold)
+            im, black_im, red_im = preprocess_image(im, label_specs, qlr, options)
             
             # 動的コマンドモード切替は本来毎ページ必要        
             try:
