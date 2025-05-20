@@ -18,9 +18,10 @@ def test_print_copies():
         '-p', 'tcp://192.168.24.92',
         'print',
         '-l', 'td62x100_203dpi',
-        '--copies', '3',
+        '--copies', '1',
         '--no-cut',
-        'label_rotated.png',
+        '--peeler',
+        'label.png',
     ])
     print('exit_code:', result.exit_code)
     print('output:')

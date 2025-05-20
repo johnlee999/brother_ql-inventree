@@ -56,10 +56,10 @@ def preprocess_image(im, label_specs, qlr, options):
         if im.size[0] != dots_printable[0]:
             hsize = int((dots_printable[0] / im.size[0]) * im.size[1])
             im = im.resize((dots_printable[0], hsize), Image.LANCZOS)
-        if im.size[0] < device_pixel_width:
-            new_im = Image.new(im.mode, (device_pixel_width, im.size[1]), (255,)*len(im.mode))
-            new_im.paste(im, (device_pixel_width-im.size[0]-right_margin_dots, 0))
-            im = new_im
+            if im.size[0] < device_pixel_width:
+                new_im = Image.new(im.mode, (device_pixel_width, im.size[1]), (255,)*len(im.mode))
+                new_im.paste(im, (device_pixel_width-im.size[0]-right_margin_dots, 0))
+                im = new_im
     elif label_specs['kind'] in (DIE_CUT_LABEL, ROUND_DIE_CUT_LABEL):
         # 1. auto回転判定
         if rotate == 'auto':
@@ -73,11 +73,12 @@ def preprocess_image(im, label_specs, qlr, options):
             im = im.rotate(rotate, expand=True)
         # 2. サイズチェック＆リサイズ
         if im.size[0] != dots_expected[0] or im.size[1] != dots_expected[1]:
+            logger.info(f"[DEBUG] 画像リサイズ: {im.size} → ({dots_printable[0]})")
             input_ratio = im.size[0] / im.size[1]
             expected_ratio = dots_expected[0] / dots_expected[1]
             ratio_tolerance = 0.01
             if abs(input_ratio - expected_ratio) / expected_ratio < ratio_tolerance:
-                im = im.resize(dots_expected, Image.NEAREST)
+                im = im.resize(dots_expected, Image.LANCZOS)
             else:
                 raise ValueError("Bad image dimensions: %s. Expecting: %s." % (im.size, dots_expected))
         if dpi_600:
@@ -111,7 +112,7 @@ def preprocess_image(im, label_specs, qlr, options):
             im = im.point(lambda x: 0 if x < threshold else 255, mode="1")
     return im, black_im, red_im
 
-def add_print_page(qlr, im, black_im, red_im, label_specs, hq, cut, is_last, is_first, compress, dpi_600, red, tape_size, feed_margin):
+def add_print_page(qlr, im, black_im, red_im, label_specs, hq, cut, peeler,is_last, is_first, compress, dpi_600, red, tape_size, feed_margin):
     qlr.clear()
     try:
         qlr.add_switch_mode()
@@ -139,10 +140,10 @@ def add_print_page(qlr, im, black_im, red_im, label_specs, hq, cut, is_last, is_
     qlr.add_media_and_quality(im.size[1])
     try:
         if cut and is_last:
-            qlr.add_autocut(True)
+            qlr.add_mode_setting(autocut=True, peeler=peeler)
             qlr.add_cut_every(1)
         else:
-            qlr.add_autocut(False)
+            qlr.add_mode_setting(autocut=False, peeler=peeler)
     except BrotherQLUnsupportedCmd:
         pass
     try:
@@ -173,6 +174,7 @@ def _rasterize_images(qlr: BrotherQLRaster, images, label, queue: bool = False, 
     right_margin_dots += right_margin_addition.get(qlr.model, 0)
     device_pixel_width = qlr.get_pixel_width()
     cut = kwargs.get('cut', True)
+    peeler = kwargs.get('peeler', False)
     dither = kwargs.get('dither', False)
     compress = kwargs.get('compress', False)
     red = kwargs.get('red', False)
@@ -210,7 +212,7 @@ def _rasterize_images(qlr: BrotherQLRaster, images, label, queue: bool = False, 
         is_first = (i == 0)
         tape_size = label_specs['tape_size']
         feed_margin = label_specs['feed_margin']
-        data = add_print_page(qlr, im, black_im, red_im, label_specs, hq, cut, is_last, is_first, compress, dpi_600, red, tape_size, feed_margin)
+        data = add_print_page(qlr, im, black_im, red_im, label_specs, hq, cut, peeler, is_last, is_first, compress, dpi_600, red, tape_size, feed_margin)
         page_data.append(data)
 
     if queue:

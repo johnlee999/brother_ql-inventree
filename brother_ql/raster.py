@@ -175,12 +175,17 @@ class BrotherQLRaster(object):
         self.data += b'\x00'
         # INFO:  media/quality (1B 69 7A) --> found! (payload: 8E 0A 3E 00 D2 00 00 00 00 00)
 
-    def add_autocut(self, autocut = False):
+    def add_mode_setting(self, autocut=False, peeler=False):
         if self.model not in cuttingsupport:
-            self._unsupported("Trying to call add_autocut with a printer that doesn't support it")
+            self._unsupported("Trying to call add_mode_setting(autocut, peeler) with a printer that doesn't support it")
             return
         self.data += b'\x1B\x69\x4D' # ESC i M
-        self.data += bytes([autocut << 6])
+        flags = 0
+        if peeler:
+            flags |= 0x10  # Bit4: ピーラー
+        if autocut:
+            flags |= 0x40  # Bit6: オートカット
+        self.data += bytes([flags])
 
     def add_cut_every(self, n=1):
         if self.model not in cuttingsupport:

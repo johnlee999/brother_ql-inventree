@@ -160,6 +160,7 @@ def env(ctx, *args, **kwargs):
 @click.option('--no-cut', is_flag=True, help="Don't cut the tape after printing the label.")
 @click.option('-q', '--queue', is_flag=True, help='Enable print queue support.')
 @click.option('--copies', type=int, default=1, show_default=True, help='Specify the number of copies to print.')
+@click.option('--peeler', is_flag=True, help='Enable peeler (label peeling) mode if supported.')
 @click.pass_context
 def print_cmd(ctx, *args, **kwargs):
     """ Print a label of the provided IMAGE. """
