@@ -121,7 +121,7 @@ def add_print_page(qlr, im, black_im, red_im, label_specs, hq, cut, is_last, is_
         qlr.add_status_information()
 
     # ここにTDの場合は「媒体情報追加コマンド」を
-    qlr.add_device_information()
+    # qlr.add_device_information()
 
     if label_specs['kind'] in (DIE_CUT_LABEL, ROUND_DIE_CUT_LABEL):
         qlr.mtype = 0x0B

@@ -4,24 +4,24 @@ from click.testing import CliRunner
 
 def test_print_copies():
     runner = CliRunner()
+    result = runner.invoke(cli, [
+        '-m', 'QL-820NWB',
+        '-p', 'tcp://192.168.24.72',
+        'print',
+        '-l', '62x100',
+        '--copies', '3',
+        '--no-cut',
+        'label.png',
+    ])
     # result = runner.invoke(cli, [
-    #     '-m', 'QL-820NWB',
-    #     '-p', 'tcp://192.168.24.72',
+    #     '-m', 'TD-4550DNWB',
+    #     '-p', 'tcp://192.168.24.71',
     #     'print',
-    #     '-l', '62x100',
-    #     '--copies', '1',
+    #     '-l', 'td62x100_300dpi',
+    #     '--copies', '3',
     #     '--no-cut',
     #     'label.png',
     # ])
-    result = runner.invoke(cli, [
-        '-m', 'TD-4420DN',
-        '-p', 'tcp://192.168.24.92',
-        'print',
-        '-l', 'td62x100_203dpi',
-        '--copies', '3',
-        '--no-cut',
-        'label_rotated.png',
-    ])
     print('exit_code:', result.exit_code)
     print('output:')
     print(result.output)

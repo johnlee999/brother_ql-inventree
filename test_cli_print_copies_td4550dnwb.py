@@ -14,13 +14,13 @@ def test_print_copies():
     #     'label.png',
     # ])
     result = runner.invoke(cli, [
-        '-m', 'TD-4420DN',
-        '-p', 'tcp://192.168.24.92',
+        '-m', 'TD-4550DNWB',
+        '-p', 'tcp://192.168.24.71',
         'print',
-        '-l', 'td62x100_203dpi',
-        '--copies', '3',
+        '-l', 'td62x100_300dpi',
+        '--copies', '5',
         '--no-cut',
-        'label_rotated.png',
+        'label.png',
     ])
     print('exit_code:', result.exit_code)
     print('output:')

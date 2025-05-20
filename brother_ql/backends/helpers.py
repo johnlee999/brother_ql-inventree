@@ -60,6 +60,8 @@ def send(instructions, printer_identifier=None, backend_identifier=None, blockin
 
     start = time.time()
     logger.info('Sending instructions to the printer. Total: %d bytes.', len(instructions))
+    with open("debug_printer_command.bin", "wb") as f:
+        f.write(instructions)
     printer.write(instructions)
     status['outcome'] = 'sent'
 
