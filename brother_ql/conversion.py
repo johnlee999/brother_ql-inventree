@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import logging
+import datetime
 
 from PIL import Image
 import PIL.ImageOps, PIL.ImageChops
@@ -60,13 +61,25 @@ def preprocess_image(im, label_specs, qlr, options):
             new_im.paste(im, (device_pixel_width-im.size[0]-right_margin_dots, 0))
             im = new_im
     elif label_specs['kind'] in (DIE_CUT_LABEL, ROUND_DIE_CUT_LABEL):
+        # 1. auto回転判定
         if rotate == 'auto':
-            if im.size[0] == dots_expected[1] and im.size[1] == dots_expected[0]:
+            # dots_expectedが縦長で画像が横長なら90度回転
+            if dots_expected[0] < dots_expected[1] and im.size[0] > im.size[1]:
                 im = im.rotate(90, expand=True)
+            # dots_expectedが横長で画像が縦長なら-90度回転（必要なら）
+            elif dots_expected[0] > dots_expected[1] and im.size[0] < im.size[1]:
+                im = im.rotate(-90, expand=True)
         elif rotate != 0:
             im = im.rotate(rotate, expand=True)
+        # 2. サイズチェック＆リサイズ
         if im.size[0] != dots_expected[0] or im.size[1] != dots_expected[1]:
-            raise ValueError("Bad image dimensions: %s. Expecting: %s." % (im.size, dots_expected))
+            input_ratio = im.size[0] / im.size[1]
+            expected_ratio = dots_expected[0] / dots_expected[1]
+            ratio_tolerance = 0.01
+            if abs(input_ratio - expected_ratio) / expected_ratio < ratio_tolerance:
+                im = im.resize(dots_expected, Image.NEAREST)
+            else:
+                raise ValueError("Bad image dimensions: %s. Expecting: %s." % (im.size, dots_expected))
         if dpi_600:
             im = im.resize((im.size[0]//2, im.size[1]))
         new_im = Image.new(im.mode, (device_pixel_width, dots_expected[1]), (255,)*len(im.mode))
@@ -98,6 +111,58 @@ def preprocess_image(im, label_specs, qlr, options):
             im = im.point(lambda x: 0 if x < threshold else 255, mode="1")
     return im, black_im, red_im
 
+def add_print_page(qlr, im, black_im, red_im, label_specs, hq, cut, is_last, is_first, compress, dpi_600, red, tape_size, feed_margin):
+    qlr.clear()
+    try:
+        qlr.add_switch_mode()
+    except BrotherQLUnsupportedCmd:
+        pass
+    if is_first:
+        qlr.add_status_information()
+
+    # ここにTDの場合は「媒体情報追加コマンド」を
+    qlr.add_device_information()
+
+    if label_specs['kind'] in (DIE_CUT_LABEL, ROUND_DIE_CUT_LABEL):
+        qlr.mtype = 0x0B
+        qlr.mwidth = tape_size[0]
+        qlr.mlength = tape_size[1]
+    elif label_specs['kind'] in (ENDLESS_LABEL, ):
+        qlr.mtype = 0x0A
+        qlr.mwidth = tape_size[0]
+        qlr.mlength = 0
+    elif label_specs['kind'] in (PTOUCH_ENDLESS_LABEL, ):
+        qlr.mtype = 0x00
+        qlr.mwidth = tape_size[0]
+        qlr.mlength = 0
+    qlr.pquality = int(hq)
+    qlr.add_media_and_quality(im.size[1])
+    try:
+        if cut and is_last:
+            qlr.add_autocut(True)
+            qlr.add_cut_every(1)
+        else:
+            qlr.add_autocut(False)
+    except BrotherQLUnsupportedCmd:
+        pass
+    try:
+        qlr.dpi_600 = dpi_600
+        qlr.cut_at_end = True
+        qlr.two_color_printing = True if red else False
+        qlr.add_expanded_mode()
+    except BrotherQLUnsupportedCmd:
+        pass
+    qlr.add_wait(0)
+    qlr.add_margins(feed_margin)
+    if qlr.compression_support:
+        qlr.add_compression(compress)
+    if red:
+        qlr.add_raster_data(black_im, red_im)
+    else:
+        qlr.add_raster_data(im)
+    qlr.add_print(last_page=is_last)
+    return qlr.data
+
 def _rasterize_images(qlr: BrotherQLRaster, images, label, queue: bool = False, copies: int = 1, **kwargs):
     """
     copies: 同じ画像を何枚印刷するか（効率化用）
@@ -124,10 +189,14 @@ def _rasterize_images(qlr: BrotherQLRaster, images, label, queue: bool = False, 
     qlr.add_initialize()
     page_data = []
     logger.info(f"Rasterizing {len(images)} pages (copies={copies})")
-    # 効率化: 画像が1枚、copies>1のときはラスタライズ1回だけ
+
+    # 画像リストを作成
     if len(images) == 1 and copies > 1:
-        # 画像の前処理・ラスタライズは1回だけ
-        image = images[0]
+        images_to_process = [images[0]] * copies
+    else:
+        images_to_process = images
+
+    for i, image in enumerate(images_to_process):
         if isinstance(image, Image.Image):
             im = image
         else:
@@ -135,131 +204,18 @@ def _rasterize_images(qlr: BrotherQLRaster, images, label, queue: bool = False, 
                 im = Image.open(image)
             except OSError:
                 raise NotImplementedError("The image argument needs to be an Image() instance, the filename to an image, or a file handle.")
-        # --- ここから下は既存の前処理 ---
         options = dict(red=red, dither=dither, rotate=rotate, dpi_600=dpi_600, dots_printable=dots_printable, device_pixel_width=device_pixel_width, right_margin_dots=right_margin_dots, threshold=threshold)
         im, black_im, red_im = preprocess_image(im, label_specs, qlr, options)
-        for i in range(copies):
-            is_last = (i == copies - 1)
-            qlr.clear()
-            try:
-                qlr.add_switch_mode()
-            except BrotherQLUnsupportedCmd:
-                pass
-            if i == 0:
-                qlr.add_status_information()
-            tape_size = label_specs['tape_size']
-            if label_specs['kind'] in (DIE_CUT_LABEL, ROUND_DIE_CUT_LABEL):
-                qlr.mtype = 0x0B
-                qlr.mwidth = tape_size[0]
-                qlr.mlength = tape_size[1]
-            elif label_specs['kind'] in (ENDLESS_LABEL, ):
-                qlr.mtype = 0x0A
-                qlr.mwidth = tape_size[0]
-                qlr.mlength = 0
-            elif label_specs['kind'] in (PTOUCH_ENDLESS_LABEL, ):
-                qlr.mtype = 0x00
-                qlr.mwidth = tape_size[0]
-                qlr.mlength = 0
-            qlr.pquality = int(hq)
-            qlr.add_media_and_quality(im.size[1])
-            try:
-                if cut and is_last:
-                    qlr.add_autocut(True)
-                    qlr.add_cut_every(1)
-                else:
-                    qlr.add_autocut(False)
-            except BrotherQLUnsupportedCmd:
-                pass
-            try:
-                qlr.dpi_600 = dpi_600
-                qlr.cut_at_end = True
-                qlr.two_color_printing = True if red else False
-                qlr.add_expanded_mode()
-            except BrotherQLUnsupportedCmd:
-                pass
-            qlr.add_margins(label_specs['feed_margin'])
-            if qlr.compression_support:
-                qlr.add_compression(compress)
-            if red:
-                qlr.add_raster_data(black_im, red_im)
-            else:
-                qlr.add_raster_data(im)
-            qlr.add_print(last_page=is_last)
-            page_data.append(qlr.data)
-    else:
-        # 既存の複数画像・通常ルート
-        for i, image in enumerate(images):
-            if isinstance(image, Image.Image):
-                im = image
-            else:
-                try:
-                    im = Image.open(image)
-                except OSError:
-                    raise NotImplementedError("The image argument needs to be an Image() instance, the filename to an image, or a file handle.")
-
-            options = dict(red=red, dither=dither, rotate=rotate, dpi_600=dpi_600, dots_printable=dots_printable, device_pixel_width=device_pixel_width, right_margin_dots=right_margin_dots, threshold=threshold)
-            im, black_im, red_im = preprocess_image(im, label_specs, qlr, options)
-            
-            # 動的コマンドモード切替は本来毎ページ必要        
-            try:
-                qlr.add_switch_mode()
-            except BrotherQLUnsupportedCmd:
-                pass
-            # ステータス情報リクエスト \x1B\x69\x53 network print の場合、不要かも？？
-            if i == 0: qlr.add_status_information()
-            
-            tape_size = label_specs['tape_size']
-            if label_specs['kind'] in (DIE_CUT_LABEL, ROUND_DIE_CUT_LABEL):
-                qlr.mtype = 0x0B
-                qlr.mwidth = tape_size[0]
-                qlr.mlength = tape_size[1]
-            elif label_specs['kind'] in (ENDLESS_LABEL, ):
-                qlr.mtype = 0x0A
-                qlr.mwidth = tape_size[0]
-                qlr.mlength = 0
-            elif label_specs['kind'] in (PTOUCH_ENDLESS_LABEL, ):
-                qlr.mtype = 0x00
-                qlr.mwidth = tape_size[0]
-                qlr.mlength = 0
-            qlr.pquality = int(hq)
-            qlr.add_media_and_quality(im.size[1])
-            try:
-                if cut:
-                    qlr.add_autocut(True)
-                    qlr.add_cut_every(1)
-            except BrotherQLUnsupportedCmd:
-                pass
-            try:
-                qlr.dpi_600 = dpi_600
-                qlr.cut_at_end = True
-                qlr.two_color_printing = True if red else False
-                qlr.add_expanded_mode()
-            except BrotherQLUnsupportedCmd:
-                pass
-            qlr.add_margins(label_specs['feed_margin'])
-            if qlr.compression_support:
-                qlr.add_compression(compress)
-            if red:
-                qlr.add_raster_data(black_im, red_im)
-            else:
-                qlr.add_raster_data(im)
-            
-            if i == len(images) - 1:
-                qlr.add_print(last_page=True)
-            else:
-                qlr.add_print(last_page=False)
-
-            # increment page number
-            qlr.page_number += 1
-
-            # add raster data to page data list and clear it
-            page_data.append(qlr.data)
-            qlr.clear()
+        is_last = (i == len(images_to_process) - 1)
+        is_first = (i == 0)
+        tape_size = label_specs['tape_size']
+        feed_margin = label_specs['feed_margin']
+        data = add_print_page(qlr, im, black_im, red_im, label_specs, hq, cut, is_last, is_first, compress, dpi_600, red, tape_size, feed_margin)
+        page_data.append(data)
 
     if queue:
         return page_data
     else:
-        # return a single bytes object for legacy conversion method 
         data = b''.join(page_data)
         return data
 

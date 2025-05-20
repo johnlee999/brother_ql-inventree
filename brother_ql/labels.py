@@ -105,6 +105,8 @@ ALL_LABELS = (
   Label("60x86",  ( 60,  87), FormFactor.DIE_CUT,       ( 708, 1024), ( 672,  954),  18 ),
   Label("62x29",  ( 62,  29), FormFactor.DIE_CUT,       ( 732,  341), ( 696,  271),  12 ),
   Label("62x100", ( 62, 100), FormFactor.DIE_CUT,       ( 732, 1179), ( 696, 1109),  12 ),
+  Label("td62x100_203dpi", ( 62, 100), FormFactor.DIE_CUT,       ( 496, 799), ( 472, 751), 180 ), # dots_total, dots_printable, offset_r
+  Label("td62x100_300dpi", ( 62, 100), FormFactor.DIE_CUT,       ( 732, 1179), ( 696, 1109), 292 ), # dots_total, dots_printable, offset_r
   Label("102x51", (102,  51), FormFactor.DIE_CUT,       (1200,  596), (1164,  526),  12 , restricted_to_models=['QL-1050', 'QL-1060N', 'QL-1100', 'QL-1110NWB', 'QL-1115NWB']),
   Label("102x152",(102, 153), FormFactor.DIE_CUT,       (1200, 1804), (1164, 1660),  12 , restricted_to_models=['QL-1050', 'QL-1060N', 'QL-1100', 'QL-1110NWB', 'QL-1115NWB']),
   # size 103 has media width 104
@@ -116,6 +118,10 @@ ALL_LABELS = (
   Label("pt18",   ( 18,   0), FormFactor.PTOUCH_ENDLESS,( 128,    0), ( 112,    0),   8, feed_margin=14),
   Label("pt24",   ( 24,   0), FormFactor.PTOUCH_ENDLESS,( 128,    0), ( 128,    0),   0, feed_margin=14),
   Label("pt36",   ( 36,   0), FormFactor.PTOUCH_ENDLESS,( 512,    0), ( 454,    0),   61, feed_margin=14),
+  Label("108x178",   ( 108, 178), FormFactor.DIE_CUT,( 832, 1423), ( 828,  1375), 0),
+  Label("108x178_300dpi",   ( 108, 178), FormFactor.DIE_CUT,( 1280, 2103), ( 1256,  2080),0),
+
+
 
 )
 

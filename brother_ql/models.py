@@ -245,6 +245,22 @@ ALL_MODELS = [
         model_code=0x70,
         product_id=0x2086,
     ),
+    Model(
+        identifier="TD-4420DN",
+        min_max_length_dots=(96, 23977),
+        number_bytes_per_row=104,
+        series_code=0x35,
+        model_code=0x38,
+        product_id=0x20b7,
+    ),
+    Model(
+        identifier="TD-4550DNWB",
+        min_max_length_dots=(142, 35433),
+        number_bytes_per_row=160,
+        series_code=0x35,
+        model_code=0x42,
+        product_id=0x20b7, # not sure
+    ),
 ]
 
 class ModelsManager(ElementsManager):
