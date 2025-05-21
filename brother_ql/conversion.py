@@ -203,6 +203,8 @@ def _rasterize_images(qlr: BrotherQLRaster, images, label, queue: bool = False, 
             im = image
         else:
             try:
+                if hasattr(image, 'seek'):
+                    image.seek(0)
                 im = Image.open(image)
             except OSError:
                 raise NotImplementedError("The image argument needs to be an Image() instance, the filename to an image, or a file handle.")
