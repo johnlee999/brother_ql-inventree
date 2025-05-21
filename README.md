@@ -10,6 +10,9 @@ Check out https://github.com/inventree/inventree to see what I forked it for.
 
 ## Main customizations and improvements in this fork (by johnlee999)
 
+To install this version, run this
+pip install --upgrade https://github.com/johnlee999/brother_ql-inventree/archive/master.zip
+
 - Added model information and label settings for TD series (e.g., TD-4420DN)
 - Improved image size conversion and auto-resizing for 203dpi labels
 - Added debug output for image resizing (shows before/after sizes in terminal)
@@ -30,6 +33,10 @@ QL-700 (✓), QL-710W (✓), QL-720NW (✓)
 QL-800 (✓), QL-810W (✓), QL-820NWB (✓)
 QL-1050 (✓), QL-1060N (✓),
 QL-1100 (✓), QL-1110NWB, QL-1115NWB.
+
+johnlee999 added following models
+
+TD-4420DN (✓), TD-4550DNWB (✓)
 
 ### Verified labels
 
@@ -60,6 +67,8 @@ The available label names can be listed with `brother_ql info labels`:
      60x86      672 x  954    60mm x 87mm die-cut
      62x29      696 x  271    62mm x 29mm die-cut
      62x100     696 x 1109    62mm x 100mm die-cut
+new  td62x100_203dpi  472 x 751    62mm x 100mm die-cut
+new  td62x100_300dpi  696 x 1109    62mm x 100mm die-cut
      102x51    1164 x  526    102mm x 51mm die-cut
      102x152   1164 x 1660    102mm x 153mm die-cut
      103x164   1200 x 1822    104mm x 164mm die-cut
