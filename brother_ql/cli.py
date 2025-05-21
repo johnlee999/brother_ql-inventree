@@ -4,6 +4,7 @@
 import logging
 import os
 from urllib.parse import urlparse
+import io
 
 # external dependencies
 import click
@@ -176,6 +177,16 @@ def print_cmd(ctx, *args, **kwargs):
     kwargs['cut'] = not kwargs['no_cut']
     del kwargs['no_cut']
     use_print_queue = kwargs.get('queue', False)
+
+    images = []
+    for f in kwargs['images']:
+        if getattr(f, 'name', None) == '<stdin>':
+            data = f.read()
+            images.append(io.BytesIO(data))
+        else:
+            images.append(f)
+    kwargs['images'] = images
+
     if use_print_queue:
         printer_instance = get_printer(printer_identifier=printer, backend_identifier=backend)
         queue = BrotherPrintQueue(printer_instance, qlr)
