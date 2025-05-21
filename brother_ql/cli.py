@@ -183,8 +183,7 @@ def print_cmd(ctx, *args, **kwargs):
     for f in kwargs['images']:
         if getattr(f, 'name', None) == '<stdin>':
             data = f.read()
-            img = Image.open(io.BytesIO(data))
-            images.append(img)
+            images.append(io.BytesIO(data))
         else:
             images.append(f)
     kwargs['images'] = images
