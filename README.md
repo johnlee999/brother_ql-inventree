@@ -8,6 +8,17 @@ Python package for the raster language protocol of the Brother QL series label p
 This is a fork of https://github.com/pklaus/brother_ql by [Philipp Klaus](https://github.com/pklaus) to enable faster updates.
 Check out https://github.com/inventree/inventree to see what I forked it for.
 
+## Main customizations and improvements in this fork (by johnlee999)
+
+- Added model information and label settings for TD series (e.g., TD-4420DN)
+- Improved image size conversion and auto-resizing for 203dpi labels
+- Added debug output for image resizing (shows before/after sizes in terminal)
+- Enhanced CLI options and control for autocut and peeler (label peeling) modes
+- Enabled saving of sent command byte sequences (print data) as binary files for debugging
+- Refactored code to reduce duplication and improved error handling
+
+---
+
 ## Verified models
 ### Verified devices
 
