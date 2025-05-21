@@ -199,7 +199,7 @@ def _rasterize_images(qlr: BrotherQLRaster, images, label, queue: bool = False, 
         images_to_process = images
 
     for i, image in enumerate(images_to_process):
-        print(f"[DEBUG] image type: {type(image)}, repr: {repr(image)}")
+        logger.info(f"[DEBUG] image type: {type(image)}, repr: {repr(image)}")
         if isinstance(image, Image.Image):
             im = image
         else:
