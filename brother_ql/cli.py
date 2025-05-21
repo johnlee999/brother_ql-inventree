@@ -5,6 +5,7 @@ import logging
 import os
 from urllib.parse import urlparse
 import io
+from PIL import Image
 
 # external dependencies
 import click
@@ -182,7 +183,8 @@ def print_cmd(ctx, *args, **kwargs):
     for f in kwargs['images']:
         if getattr(f, 'name', None) == '<stdin>':
             data = f.read()
-            images.append(io.BytesIO(data))
+            img = Image.open(io.BytesIO(data))
+            images.append(img)
         else:
             images.append(f)
     kwargs['images'] = images
