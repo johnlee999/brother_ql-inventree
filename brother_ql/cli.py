@@ -5,7 +5,6 @@ import logging
 import os
 from urllib.parse import urlparse
 import io
-from PIL import Image
 
 # external dependencies
 import click
@@ -181,27 +180,11 @@ def print_cmd(ctx, *args, **kwargs):
 
     images = []
     for f in kwargs['images']:
-        print(f"[DEBUG] f.name: {getattr(f, 'name', None)} type: {type(f)}", flush=True)
-        # ファイル名指定
-        if hasattr(f, 'name') and f.name not in (None, '-', '<stdin>', 'stdin'):
-            images.append(f)
-        # 標準入力（またはBytesIO）
+        if getattr(f, 'name', None) == '<stdin>':
+            data = f.read()
+            images.append(io.BytesIO(data))
         else:
-            # すでにBytesIOならそのまま
-            if isinstance(f, io.BytesIO):
-                # 必要ならここでdebug_stdin.pngに書き出しも可能
-                f.seek(0)
-                data = f.read()
-                with open("debug_stdin.png", "wb") as debug_f:
-                    debug_f.write(data)
-                f.seek(0)
-                images.append(f)
-            else:
-                # それ以外は一応readしてBytesIO化
-                data = f.read()
-                with open("debug_stdin.png", "wb") as debug_f:
-                    debug_f.write(data)
-                images.append(io.BytesIO(data))
+            images.append(f)
     kwargs['images'] = images
 
     if use_print_queue:

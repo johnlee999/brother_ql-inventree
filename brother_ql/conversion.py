@@ -199,19 +199,13 @@ def _rasterize_images(qlr: BrotherQLRaster, images, label, queue: bool = False, 
         images_to_process = images
 
     for i, image in enumerate(images_to_process):
-        logger.info(f"[DEBUG] image type: {type(image)}, repr: {repr(image)}")
         if isinstance(image, Image.Image):
             im = image
         else:
             try:
-                if hasattr(image, 'seek'):
-                    image.seek(0)
                 im = Image.open(image)
-            except Exception as e:
-                print(f"[DEBUG] type(image): {type(image)}, repr(image): {repr(image)}")
-                raise NotImplementedError(
-                    f"The image argument needs to be an Image() instance, the filename to an image, or a file handle. Error: {e}"
-                )
+            except OSError:
+                raise NotImplementedError("The image argument needs to be an Image() instance, the filename to an image, or a file handle.")
         options = dict(red=red, dither=dither, rotate=rotate, dpi_600=dpi_600, dots_printable=dots_printable, device_pixel_width=device_pixel_width, right_margin_dots=right_margin_dots, threshold=threshold)
         im, black_im, red_im = preprocess_image(im, label_specs, qlr, options)
         is_last = (i == len(images_to_process) - 1)
