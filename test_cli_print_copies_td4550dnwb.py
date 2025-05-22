@@ -60,5 +60,5 @@ def test_print_copies_stdin():
     assert result.exit_code == 0
 
 if __name__ == '__main__':
-    test_print_copies_file()
+    # test_print_copies_file()
     test_print_copies_stdin() 
