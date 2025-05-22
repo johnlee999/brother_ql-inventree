@@ -183,6 +183,8 @@ def print_cmd(ctx, *args, **kwargs):
     for f in kwargs['images']:
         if getattr(f, 'name', None) == '<stdin>':
             data = f.read()
+            with open("debug_stdin.png", "wb") as debug_f:
+                debug_f.write(data)
             logger.info(f"[DEBUG] data head: {data[:16]}", flush=True)
             logger.info(f"[DEBUG] data len: {len(data)}", flush=True)
             images.append(io.BytesIO(data))
